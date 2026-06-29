@@ -36,9 +36,8 @@ build_libffi() {
 ensure_tools
 prepare_dirs
 
-build_libffi "iphoneos" "iphoneos" "arm-apple-darwin" "-miphoneos-version-min=$IOS_DEPLOYMENT_TARGET"
-build_libffi "iphonesimulator" "iphonesimulator" "arm-apple-darwin" \
+build_libffi "iphoneos" "iphoneos" "aarch64-apple-darwin" "-miphoneos-version-min=$IOS_DEPLOYMENT_TARGET"
+build_libffi "iphonesimulator" "iphonesimulator" "aarch64-apple-darwin" \
   "-mios-simulator-version-min=$IOS_DEPLOYMENT_TARGET"
 
 log "libffi builds are ready in $PREFIX_DIR"
-

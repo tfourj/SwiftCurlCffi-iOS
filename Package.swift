@@ -16,10 +16,7 @@ let package = Package(
     targets: [
         .target(
             name: "SwiftCurlCffiIOS",
-            resources: [
-                .process("Resources")
-            ]
+            exclude: ["Resources"]
         )
     ]
 )
-

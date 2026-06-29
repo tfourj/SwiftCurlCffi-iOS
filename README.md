@@ -24,8 +24,9 @@ Sources/SwiftCurlCffiIOS/Resources/curl_cffi_ios_payload.zip
 Sources/SwiftCurlCffiIOS/Resources/manifest.json
 ```
 
-The Swift target exposes those resources through `SwiftCurlCffiIOS.payloadURL`
-and `SwiftCurlCffiIOS.manifestURL`.
+The Swift target is a lightweight marker library. The payload resources are
+excluded from SwiftPM resource processing so Palladium's build script can unpack
+and process them once from the copied `Frameworks/SwiftCurlCffi-iOS` checkout.
 
 ## Requirements
 
@@ -62,8 +63,8 @@ PALLADIUM_ROOT=/path/to/Palladium ./scripts/export-to-palladium.sh
 ```
 
 This copies the generated Swift package resources into Palladium's dependency
-checkout location. Palladium still needs integration code that unpacks the
-payload into its app support Python package directory and calls Python's
+checkout location. Palladium's Xcode build script unpacks the platform-specific
+payload into the app bundle's `python-packages` directory and calls Python's
 `install_python` helper with that package path so `.so` files are converted
 into loadable iOS frameworks at build time.
 
@@ -73,4 +74,3 @@ The scripts build the native pieces outside the iOS sandbox. They intentionally
 do not attempt to run `pip install curl-cffi` on-device. If upstream changes
 `curl-cffi`, `cffi`, or `curl-impersonate` build internals, the Python package
 staging script may need updates.
-

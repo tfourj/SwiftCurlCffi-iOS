@@ -3,15 +3,25 @@ set -eu
 
 . "$(dirname "$0")/common.sh"
 
+HOST_BUILD_PACKAGES="$BUILD_DIR/HostPythonPackages"
+
+ensure_host_python_packages() {
+  mkdir -p "$HOST_BUILD_PACKAGES"
+  "$HOST_PYTHON" -m pip install \
+    --target "$HOST_BUILD_PACKAGES" \
+    --upgrade \
+    --only-binary :all: \
+    "cffi" "setuptools"
+}
+
 copy_python_sources() {
   payload=$1
 
   mkdir -p "$payload"
   "$HOST_PYTHON" -m pip install \
     --target "$payload" \
-    --no-binary :all: \
+    --only-binary :all: \
     --no-deps \
-    --no-build-isolation \
     "certifi" "pycparser"
 
   [ -d "$SOURCES_DIR/cffi/src/cffi" ] || die "cffi source missing; run scripts/fetch-sources.sh"
@@ -20,6 +30,35 @@ copy_python_sources() {
   rm -rf "$payload/cffi" "$payload/curl_cffi"
   cp -R "$SOURCES_DIR/cffi/src/cffi" "$payload/cffi"
   cp -R "$SOURCES_DIR/curl_cffi/curl_cffi" "$payload/curl_cffi"
+  find "$payload/curl_cffi" \
+    \( -name '*.so' -o -name '*.o' -o -name '*.dylib' -o -name '_wrapper.c' \) \
+    -delete
+  write_minimal_dist_info "$payload" "cffi" "$CFFI_VERSION"
+  write_minimal_dist_info "$payload" "curl-cffi" "$CURL_CFFI_VERSION"
+}
+
+write_minimal_dist_info() {
+  payload=$1
+  package_name=$2
+  version=$3
+  safe_name=$(printf '%s' "$package_name" | tr '-' '_')
+  dist_info="$payload/$safe_name-$version.dist-info"
+
+  rm -rf "$dist_info"
+  mkdir -p "$dist_info"
+  cat > "$dist_info/METADATA" <<EOF
+Metadata-Version: 2.1
+Name: $package_name
+Version: $version
+EOF
+  cat > "$dist_info/WHEEL" <<EOF
+Wheel-Version: 1.0
+Generator: SwiftCurlCffi-iOS
+Root-Is-Purelib: false
+Tag: py3-none-any
+EOF
+  printf 'SwiftCurlCffi-iOS\n' > "$dist_info/INSTALLER"
+  : > "$dist_info/RECORD"
 }
 
 build_cffi_backend() {
@@ -64,7 +103,8 @@ generate_curl_cffi_wrapper() {
   log "generating curl_cffi CFFI wrapper"
   (
     cd "$SOURCES_DIR/curl_cffi"
-    "$HOST_PYTHON" scripts/build.py
+    PYTHONPATH="$HOST_BUILD_PACKAGES${PYTHONPATH:+:$PYTHONPATH}" \
+      "$HOST_PYTHON" scripts/build.py
   )
 }
 
@@ -74,6 +114,7 @@ build_curl_cffi_wrapper() {
   payload=$3
   src="$SOURCES_DIR/curl_cffi"
   curl_prefix=$(platform_prefix_dir "$platform" "curl-impersonate")
+  curl_deps_dir=$(platform_build_dir "$platform" "curl-impersonate")/deps/install/lib
   out_suffix=$(extension_suffix_for_platform "$platform")
   out="$payload/curl_cffi/_wrapper$out_suffix"
   cc=$(clang_for_sdk "$sdk")
@@ -85,8 +126,35 @@ build_curl_cffi_wrapper() {
 
   [ -f "$src/curl_cffi/_wrapper.c" ] || die "missing generated curl_cffi wrapper"
   [ -d "$curl_prefix/include" ] || die "missing curl-impersonate prefix for $platform"
+  [ -d "$curl_deps_dir" ] || die "missing curl-impersonate dependency libs for $platform"
   curl_archive=$(find "$curl_prefix/lib" -name 'libcurl*.a' -print | head -1 || true)
   [ -n "$curl_archive" ] || die "missing curl static library for $platform"
+  nghttp2_archive="$curl_deps_dir/libnghttp2.a"
+  nghttp3_archive="$curl_deps_dir/libnghttp3.a"
+  ngtcp2_archive="$curl_deps_dir/libngtcp2.a"
+  ngtcp2_crypto_archive="$curl_deps_dir/libngtcp2_crypto_boringssl.a"
+  ssl_archive="$curl_deps_dir/libssl.a"
+  crypto_archive="$curl_deps_dir/libcrypto.a"
+  brotli_decode_archive="$curl_deps_dir/libbrotlidec.a"
+  brotli_encode_archive="$curl_deps_dir/libbrotlienc.a"
+  brotli_common_archive="$curl_deps_dir/libbrotlicommon.a"
+  zstd_archive="$curl_deps_dir/libzstd.a"
+  zlib_archive="$curl_deps_dir/libz.a"
+  for archive in \
+    "$nghttp2_archive" \
+    "$nghttp3_archive" \
+    "$ngtcp2_archive" \
+    "$ngtcp2_crypto_archive" \
+    "$ssl_archive" \
+    "$crypto_archive" \
+    "$brotli_decode_archive" \
+    "$brotli_encode_archive" \
+    "$brotli_common_archive" \
+    "$zstd_archive" \
+    "$zlib_archive"
+  do
+    [ -f "$archive" ] || die "missing curl dependency archive: $archive"
+  done
 
   log "building curl_cffi wrapper for $platform"
   "$cc" -dynamiclib -fPIC -arch arm64 \
@@ -94,14 +162,29 @@ build_curl_cffi_wrapper() {
     "$min_flag" \
     -I"$py_headers" \
     -I"$curl_prefix/include" \
+    -I"$src/ffi" \
     -F"$py_framework_parent" \
     "$src/curl_cffi/_wrapper.c" \
+    "$src/ffi/shim.c" \
     "$curl_archive" \
+    "$nghttp2_archive" \
+    "$nghttp3_archive" \
+    "$ngtcp2_archive" \
+    "$ngtcp2_crypto_archive" \
+    "$ssl_archive" \
+    "$crypto_archive" \
+    "$brotli_decode_archive" \
+    "$brotli_encode_archive" \
+    "$brotli_common_archive" \
+    "$zstd_archive" \
+    "$zlib_archive" \
     -framework Python \
     -framework CoreFoundation \
     -framework Security \
     -framework SystemConfiguration \
-    -lz \
+    -lc++ \
+    -liconv \
+    -licucore \
     -install_name "$install_name" \
     -o "$out"
 }
@@ -124,6 +207,7 @@ EOF
 ensure_tools
 ensure_python_xcframework
 prepare_dirs
+ensure_host_python_packages
 
 PAYLOAD_DIR="$ARTIFACTS_DIR/curl_cffi_ios_payload"
 rm -rf "$PAYLOAD_DIR"

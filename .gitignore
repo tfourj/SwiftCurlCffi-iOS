@@ -2,7 +2,7 @@
 .swiftpm/
 Artifacts/
 Build/
+Dist/
 Sources/SwiftCurlCffiIOS/Resources/curl_cffi_ios_payload.zip
 Sources/SwiftCurlCffiIOS/Resources/manifest.json
 Sources/SwiftCurlCffiIOS/Resources/.artifact-ready
-

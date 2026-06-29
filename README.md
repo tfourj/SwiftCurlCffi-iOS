@@ -54,6 +54,25 @@ When this repo is checked out next to Palladium, the default works:
 ./scripts/build-all.sh
 ```
 
+## Release Zip
+
+After a successful build, package the local checkout and generated payload into
+the zip consumed by Palladium:
+
+```sh
+./scripts/package-release.sh
+```
+
+This writes:
+
+```text
+Dist/SwiftCurlCffi-iOS.zip
+```
+
+The GitHub Actions workflow builds the same zip. Pushes upload it as a workflow
+artifact, and tag builds publish it as a GitHub release asset named
+`SwiftCurlCffi-iOS.zip`.
+
 ## Export To Palladium
 
 After a successful build:

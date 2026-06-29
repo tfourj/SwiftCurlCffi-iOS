@@ -1,0 +1,109 @@
+name: Build SwiftCurlCffi-iOS
+
+on:
+  push:
+    branches: [main]
+    tags: ["*"]
+    paths:
+      - ".github/workflows/build_release.yml"
+      - "Package.swift"
+      - "Sources/**"
+      - "docs/**"
+      - "scripts/**"
+      - ".gitignore"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 120
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Xcode 26.2
+      uses: maxim-lobanov/setup-xcode@v1
+      with:
+        xcode-version: "26.2"
+
+    - name: Show tool versions
+      run: |
+        set -euo pipefail
+        xcodebuild -version
+        swift --version
+        python3 --version
+
+    - name: Install build tools
+      run: |
+        set -euo pipefail
+        brew install cmake ninja
+
+    - name: Download Python Apple Support
+      uses: robinraju/release-downloader@v1
+      with:
+        repository: beeware/Python-Apple-support
+        latest: true
+        fileName: "*iOS-support*.tar.gz"
+        out-file-path: python-download
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Install Python Apple Support
+      run: |
+        set -euo pipefail
+
+        tmp_dir=$(mktemp -d)
+        frameworks_dir="$GITHUB_WORKSPACE/Frameworks"
+        archive_path=$(find "$GITHUB_WORKSPACE/python-download" -maxdepth 1 -type f -name "*iOS-support*.tar.gz" | head -n 1)
+
+        if [ -z "$archive_path" ]; then
+          echo "Could not find downloaded iOS support archive."
+          find "$GITHUB_WORKSPACE/python-download" -maxdepth 2 -print
+          exit 1
+        fi
+
+        extract_dir="$tmp_dir/extracted"
+        mkdir -p "$extract_dir"
+        tar -xzf "$archive_path" -C "$extract_dir"
+
+        xcframework_path=$(find "$extract_dir" -type d -name "Python.xcframework" | head -n 1)
+        if [ -z "$xcframework_path" ]; then
+          echo "Python.xcframework not found in extracted archive."
+          find "$extract_dir" -maxdepth 3 -type d
+          exit 1
+        fi
+
+        mkdir -p "$frameworks_dir"
+        rm -rf "$frameworks_dir/Python.xcframework"
+        cp -R "$xcframework_path" "$frameworks_dir/Python.xcframework"
+
+        echo "Installed Python.xcframework:"
+        ls -la "$frameworks_dir/Python.xcframework"
+
+    - name: Build curl-cffi payload
+      env:
+        PYTHON_XCFRAMEWORK: ${{ github.workspace }}/Frameworks/Python.xcframework
+      run: |
+        set -euo pipefail
+        ./scripts/build-all.sh
+
+    - name: Package release zip
+      run: |
+        set -euo pipefail
+        ./scripts/package-release.sh
+
+    - name: Upload release zip artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: SwiftCurlCffi-iOS
+        path: Dist/SwiftCurlCffi-iOS.zip
+
+    - name: Publish GitHub release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v2
+      with:
+        files: Dist/SwiftCurlCffi-iOS.zip

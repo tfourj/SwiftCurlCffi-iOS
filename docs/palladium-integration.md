@@ -3,6 +3,21 @@
 The generated payload is not a normal PyPI wheel. Palladium should treat it as a
 prebuilt, app-bundled Python package payload.
 
+## Release Asset
+
+Palladium's CI downloads the latest GitHub release asset:
+
+```text
+SwiftCurlCffi-iOS.zip
+```
+
+The zip should contain a top-level `SwiftCurlCffi-iOS` folder with the generated
+payload at:
+
+```text
+Sources/SwiftCurlCffiIOS/Resources/curl_cffi_ios_payload.zip
+```
+
 ## Install Location
 
 During Palladium's Xcode build:

@@ -39,6 +39,12 @@ and process them once from the copied `Frameworks/SwiftCurlCffi-iOS` checkout.
 - Palladium's `Python.xcframework`
 
 Defaults target Python `3.14` because Palladium currently bundles Python 3.14.
+`curl-cffi` defaults to `latest`, with prereleases allowed because Python 3.14
+support may land in prerelease builds first.
+
+The build must run on macOS with Xcode because it uses `xcrun`, Apple iOS SDKs,
+and the iPhoneOS/iPhoneSimulator arm64 toolchains. GitHub-hosted Ubuntu runners
+do not include the Apple SDK or a legal Xcode toolchain.
 
 ## Build
 
@@ -53,6 +59,21 @@ When this repo is checked out next to Palladium, the default works:
 ```sh
 ./scripts/build-all.sh
 ```
+
+To pin a specific curl-cffi release instead:
+
+```sh
+CURL_CFFI_VERSION=0.15.1b2 ./scripts/build-all.sh
+```
+
+To resolve only stable curl-cffi releases:
+
+```sh
+CURL_CFFI_ALLOW_PRERELEASES=0 ./scripts/build-all.sh
+```
+
+For local rebuilds, run `./scripts/clean.sh` first if an older source checkout
+has already been fetched.
 
 ## Release Zip
 

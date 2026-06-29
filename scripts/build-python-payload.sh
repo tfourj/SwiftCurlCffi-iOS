@@ -33,8 +33,8 @@ copy_python_sources() {
   find "$payload/curl_cffi" \
     \( -name '*.so' -o -name '*.o' -o -name '*.dylib' -o -name '_wrapper.c' \) \
     -delete
-  write_minimal_dist_info "$payload" "cffi" "$CFFI_VERSION"
-  write_minimal_dist_info "$payload" "curl-cffi" "$CURL_CFFI_VERSION"
+  write_minimal_dist_info "$payload" "cffi" "$CFFI_BUILD_VERSION"
+  write_minimal_dist_info "$payload" "curl-cffi" "$CURL_CFFI_BUILD_VERSION"
 }
 
 write_minimal_dist_info() {
@@ -194,8 +194,8 @@ write_manifest() {
   manifest=$2
   cat > "$manifest" <<EOF
 {
-  "curl_cffi": "$CURL_CFFI_VERSION",
-  "cffi": "$CFFI_VERSION",
+  "curl_cffi": "$CURL_CFFI_BUILD_VERSION",
+  "cffi": "$CFFI_BUILD_VERSION",
   "libffi": "$LIBFFI_VERSION",
   "python": "$PYTHON_VERSION",
   "platforms": ["iphoneos-arm64", "iphonesimulator-arm64"],
@@ -208,6 +208,11 @@ ensure_tools
 ensure_python_xcframework
 prepare_dirs
 ensure_host_python_packages
+
+CFFI_BUILD_VERSION=$(effective_package_version \
+  "CFFI_RESOLVED_VERSION" "$CFFI_VERSION" "$SOURCES_DIR/cffi" "cffi")
+CURL_CFFI_BUILD_VERSION=$(effective_package_version \
+  "CURL_CFFI_RESOLVED_VERSION" "$CURL_CFFI_VERSION" "$SOURCES_DIR/curl_cffi" "curl-cffi")
 
 PAYLOAD_DIR="$ARTIFACTS_DIR/curl_cffi_ios_payload"
 rm -rf "$PAYLOAD_DIR"

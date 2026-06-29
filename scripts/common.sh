@@ -7,11 +7,13 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-$ROOT_DIR/Artifacts}"
 SOURCES_DIR="$BUILD_DIR/Sources"
 PREFIX_DIR="$BUILD_DIR/Prefix"
 RESOURCES_DIR="$ROOT_DIR/Sources/SwiftCurlCffiIOS/Resources"
+RESOLVED_VERSIONS_FILE="$BUILD_DIR/resolved-versions.env"
 
 IOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET:-15.0}"
 PYTHON_VERSION="${PYTHON_VERSION:-3.14}"
 PYTHON_TAG="${PYTHON_TAG:-cpython-314}"
-CURL_CFFI_VERSION="${CURL_CFFI_VERSION:-0.15.1b2}"
+CURL_CFFI_VERSION="${CURL_CFFI_VERSION:-latest}"
+CURL_CFFI_ALLOW_PRERELEASES="${CURL_CFFI_ALLOW_PRERELEASES:-1}"
 CFFI_VERSION="${CFFI_VERSION:-2.0.0}"
 LIBFFI_VERSION="${LIBFFI_VERSION:-3.5.2}"
 CURL_IMPERSONATE_REF="${CURL_IMPERSONATE_REF:-main}"
@@ -136,4 +138,60 @@ platform_prefix_dir() {
 
 prepare_dirs() {
   mkdir -p "$BUILD_DIR" "$ARTIFACTS_DIR" "$SOURCES_DIR" "$PREFIX_DIR" "$RESOURCES_DIR"
+}
+
+version_from_sdist_archive() {
+  archive=$1
+  pkg_info=$(tar -tzf "$archive" | grep '/PKG-INFO$' | head -1 || true)
+  [ -n "$pkg_info" ] || return 1
+
+  tar -xOzf "$archive" "$pkg_info" \
+    | awk -F': ' 'tolower($1) == "version" { print $2; exit }'
+}
+
+version_from_source_dir() {
+  src=$1
+  [ -f "$src/PKG-INFO" ] || return 1
+
+  awk -F': ' 'tolower($1) == "version" { print $2; exit }' "$src/PKG-INFO"
+}
+
+record_resolved_version() {
+  key=$1
+  version=$2
+  tmp="$RESOLVED_VERSIONS_FILE.tmp"
+
+  mkdir -p "$BUILD_DIR"
+  if [ -f "$RESOLVED_VERSIONS_FILE" ]; then
+    grep -v "^$key='" "$RESOLVED_VERSIONS_FILE" > "$tmp" || true
+  else
+    : > "$tmp"
+  fi
+  printf "%s='%s'\n" "$key" "$version" >> "$tmp"
+  mv "$tmp" "$RESOLVED_VERSIONS_FILE"
+}
+
+read_resolved_version() {
+  key=$1
+  [ -f "$RESOLVED_VERSIONS_FILE" ] || return 1
+
+  sed -n "s/^$key='\(.*\)'$/\1/p" "$RESOLVED_VERSIONS_FILE" | tail -1
+}
+
+effective_package_version() {
+  key=$1
+  requested=$2
+  src=$3
+  label=$4
+
+  version=$(read_resolved_version "$key" || true)
+  if [ -z "$version" ]; then
+    version=$(version_from_source_dir "$src" || true)
+  fi
+  if [ -z "$version" ] && [ "$requested" != "latest" ]; then
+    version=$requested
+  fi
+  [ -n "$version" ] || die "$label version unresolved; run scripts/fetch-sources.sh first"
+
+  printf '%s\n' "$version"
 }

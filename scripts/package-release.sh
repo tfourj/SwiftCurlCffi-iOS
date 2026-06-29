@@ -23,6 +23,9 @@ rsync -au --delete \
   --exclude Artifacts \
   --exclude Build \
   --exclude Dist \
+  --exclude Frameworks \
+  --exclude python-download \
+  --exclude .DS_Store \
   "$ROOT_DIR/" "$STAGE_DIR/"
 
 (

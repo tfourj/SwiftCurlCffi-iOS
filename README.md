@@ -66,14 +66,34 @@ To pin a specific curl-cffi release instead:
 CURL_CFFI_VERSION=0.15.1b2 ./scripts/build-all.sh
 ```
 
+or with command-line options:
+
+```sh
+./scripts/build-all.sh --curl-cffi-version 0.15.1b2
+```
+
+Use `--clean` when switching versions from a previously fetched source tree:
+
+```sh
+./scripts/build-all.sh --clean --curl-cffi-version 0.15.1b1
+```
+
 To resolve only stable curl-cffi releases:
 
 ```sh
 CURL_CFFI_ALLOW_PRERELEASES=0 ./scripts/build-all.sh
 ```
 
-For local rebuilds, run `./scripts/clean.sh` first if an older source checkout
-has already been fetched.
+or:
+
+```sh
+./scripts/build-all.sh --no-curl-cffi-prereleases
+```
+
+Run `./scripts/build-all.sh --help` to see all supported options.
+
+For local rebuilds, use `--clean` or run `./scripts/clean.sh` first if you want
+to discard previously fetched sources and generated outputs.
 
 ## Release Zip
 

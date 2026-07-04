@@ -3,6 +3,8 @@ set -eu
 
 . "$(dirname "$0")/common.sh"
 
+parse_common_args "$@"
+
 build_libffi() {
   platform=$1
   sdk=$2

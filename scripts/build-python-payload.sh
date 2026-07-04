@@ -3,6 +3,8 @@ set -eu
 
 . "$(dirname "$0")/common.sh"
 
+parse_common_args "$@"
+
 HOST_BUILD_PACKAGES="$BUILD_DIR/HostPythonPackages"
 
 ensure_host_python_packages() {

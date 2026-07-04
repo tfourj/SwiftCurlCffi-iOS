@@ -3,6 +3,7 @@ set -eu
 
 . "$(dirname "$0")/common.sh"
 
+parse_common_args "$@"
 ensure_tools
 prepare_dirs
 
@@ -33,12 +34,19 @@ download_pypi_sdist() {
   project_download_dir="$download_dir/$project"
 
   if [ -d "$target" ]; then
-    log "$project already fetched"
     resolved_version=$(version_from_source_dir "$target" || true)
-    if [ -n "$resolved_version" ]; then
-      record_resolved_version "$version_key" "$resolved_version"
+    if [ "$version" != "latest" ] && \
+      { [ -z "$resolved_version" ] || [ "$resolved_version" != "$version" ]; }
+    then
+      log "$project fetched version ${resolved_version:-unknown} does not match $version; refetching"
+      rm -rf "$target"
+    else
+      log "$project already fetched"
+      if [ -n "$resolved_version" ]; then
+        record_resolved_version "$version_key" "$resolved_version"
+      fi
+      return
     fi
-    return
   fi
 
   if [ "$version" = "latest" ]; then

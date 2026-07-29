@@ -13,6 +13,28 @@ on:
       - ".gitignore"
       - "README.md"
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      curl_cffi_version:
+        description: curl_cffi version to build without the leading v
+        required: false
+        type: string
+        default: ""
+      release_tag:
+        description: Git tag to create for the release
+        required: false
+        type: string
+        default: ""
+      release_name:
+        description: GitHub release title
+        required: false
+        type: string
+        default: ""
+      release_prerelease:
+        description: Whether to publish the GitHub release as a prerelease
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -84,8 +106,29 @@ jobs:
         echo "Installed Python.xcframework:"
         ls -la "$frameworks_dir/Python.xcframework"
 
+    - name: Resolve curl-cffi version
+      id: curl-cffi
+      env:
+        REQUESTED_VERSION: ${{ inputs.curl_cffi_version }}
+        REF_NAME: ${{ github.ref_name }}
+        REF_TYPE: ${{ github.ref_type }}
+      run: |
+        set -euo pipefail
+
+        if [ -n "$REQUESTED_VERSION" ]; then
+          version="$REQUESTED_VERSION"
+        elif [ "$REF_TYPE" = "tag" ]; then
+          version="${REF_NAME#v}"
+        else
+          version="latest"
+        fi
+
+        echo "Building curl-cffi $version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
     - name: Build curl-cffi payload
       env:
+        CURL_CFFI_VERSION: ${{ steps.curl-cffi.outputs.version }}
         PYTHON_XCFRAMEWORK: ${{ github.workspace }}/Frameworks/Python.xcframework
       run: |
         set -euo pipefail
@@ -103,7 +146,10 @@ jobs:
         path: Dist/SwiftCurlCffi-iOS.zip
 
     - name: Publish GitHub release
-      if: startsWith(github.ref, 'refs/tags/')
+      if: inputs.release_tag != '' || startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
         files: Dist/SwiftCurlCffi-iOS.zip
+        tag_name: ${{ inputs.release_tag || github.ref_name }}
+        name: ${{ inputs.release_name || inputs.release_tag || github.ref_name }}
+        prerelease: ${{ inputs.release_prerelease }}

@@ -119,7 +119,7 @@ artifact, and tag builds publish it as a GitHub release asset named
 The `Sync curl_cffi release` GitHub Actions workflow runs once per day at
 05:23 UTC and can also be started manually. It checks the official
 `lexiforest/curl_cffi` GitHub releases, including prereleases, and compares the
-newest published tag with this repository's releases.
+newest published tag with this repository's release assets.
 
 When the matching release does not exist here, the workflow:
 
@@ -127,9 +127,9 @@ When the matching release does not exist here, the workflow:
 2. Creates a release using the same tag, title, and prerelease status.
 3. Uploads `SwiftCurlCffi-iOS.zip` to that release.
 
-Existing releases are skipped, so repeated daily checks do not rebuild or
-republish the same version. If a build fails, no release is created and the
-next scheduled run tries that upstream version again.
+Existing `SwiftCurlCffi-iOS.zip` release assets are skipped, so repeated daily
+checks do not rebuild or republish the same version. If a build or asset upload
+fails, the next scheduled run tries that upstream version again.
 
 ## Export To Palladium
 

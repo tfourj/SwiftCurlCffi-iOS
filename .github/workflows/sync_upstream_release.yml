@@ -1,0 +1,104 @@
+name: Sync curl_cffi release
+
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-curl-cffi-release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: Check upstream release
+    runs-on: ubuntu-latest
+    outputs:
+      release_name: ${{ steps.release.outputs.release_name }}
+      release_prerelease: ${{ steps.release.outputs.release_prerelease }}
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      release_version: ${{ steps.release.outputs.release_version }}
+      should_publish: ${{ steps.release.outputs.should_publish }}
+
+    steps:
+      - name: Find newest published curl_cffi release
+        id: release
+        uses: actions/github-script@v9
+        with:
+          retries: 3
+          script: |
+            const releases = await github.paginate(
+              github.rest.repos.listReleases,
+              {
+                owner: "lexiforest",
+                repo: "curl_cffi",
+                per_page: 100,
+              },
+            );
+            const published = releases
+              .filter((release) => !release.draft && release.published_at)
+              .sort(
+                (left, right) =>
+                  Date.parse(right.published_at) -
+                  Date.parse(left.published_at),
+              );
+            const upstream = published[0];
+
+            if (!upstream) {
+              core.setFailed("curl_cffi has no published GitHub releases");
+              return;
+            }
+
+            const tag = upstream.tag_name;
+            const version = tag.startsWith("v") ? tag.slice(1) : tag;
+            const releaseName = upstream.name || tag;
+            let shouldPublish = true;
+
+            try {
+              await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag,
+              });
+              shouldPublish = false;
+            } catch (error) {
+              if (error.status !== 404) {
+                throw error;
+              }
+            }
+
+            core.setOutput("release_name", releaseName);
+            core.setOutput("release_prerelease", upstream.prerelease);
+            core.setOutput("release_tag", tag);
+            core.setOutput("release_version", version);
+            core.setOutput("should_publish", shouldPublish);
+
+            await core.summary
+              .addHeading("curl_cffi release sync")
+              .addTable([
+                [
+                  { data: "Upstream release", header: true },
+                  { data: "Value", header: true },
+                ],
+                ["Tag", tag],
+                ["Title", releaseName],
+                ["Prerelease", String(upstream.prerelease)],
+                ["Already published", String(!shouldPublish)],
+              ])
+              .write();
+
+  publish:
+    name: Build and publish matching iOS release
+    needs: check
+    if: needs.check.outputs.should_publish == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/build_release.yml
+    with:
+      curl_cffi_version: ${{ needs.check.outputs.release_version }}
+      release_tag: ${{ needs.check.outputs.release_tag }}
+      release_name: ${{ needs.check.outputs.release_name }}
+      release_prerelease: ${{ needs.check.outputs.release_prerelease == 'true' }}

@@ -114,6 +114,23 @@ The GitHub Actions workflow builds the same zip. Pushes upload it as a workflow
 artifact, and tag builds publish it as a GitHub release asset named
 `SwiftCurlCffi-iOS.zip`.
 
+## Automatic Releases
+
+The `Sync curl_cffi release` GitHub Actions workflow runs once per day at
+05:23 UTC and can also be started manually. It checks the official
+`lexiforest/curl_cffi` GitHub releases, including prereleases, and compares the
+newest published tag with this repository's releases.
+
+When the matching release does not exist here, the workflow:
+
+1. Builds the exact upstream `curl_cffi` version for iOS.
+2. Creates a release using the same tag, title, and prerelease status.
+3. Uploads `SwiftCurlCffi-iOS.zip` to that release.
+
+Existing releases are skipped, so repeated daily checks do not rebuild or
+republish the same version. If a build fails, no release is created and the
+next scheduled run tries that upstream version again.
+
 ## Export To Palladium
 
 After a successful build:

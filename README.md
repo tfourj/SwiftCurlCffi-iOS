@@ -118,15 +118,19 @@ release asset named `SwiftCurlCffi-iOS.zip`.
 Releases do not run on pushes, tags, or a schedule. Start the
 `Build and release SwiftCurlCffi-iOS` workflow from the GitHub Actions page and
 enter the exact published `lexiforest/curl_cffi` release tag to build, including
-its leading `v`, for example `v0.15.1`.
+its leading `v`, for example `v0.15.1`. Leave `Publish as latest` cleared to
+create a prerelease.
 
 The workflow:
 
 1. Verifies that the tag belongs to a published upstream release.
 2. Builds that exact `curl_cffi` version for iOS.
-3. Creates or updates this repository's release with the exact same tag and
-   prerelease status.
+3. Creates or updates this repository's prerelease with the exact same tag.
 4. Uploads `SwiftCurlCffi-iOS.zip` to the release.
+
+To promote a prerelease, run the workflow again with the same tag and enable
+`Publish as latest`. The existing release is updated to a full latest release,
+and its `SwiftCurlCffi-iOS.zip` asset is replaced by the new build.
 
 Only one workflow run for a given tag can execute at a time.
 

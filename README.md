@@ -110,26 +110,25 @@ This writes:
 Dist/SwiftCurlCffi-iOS.zip
 ```
 
-The GitHub Actions workflow builds the same zip. Pushes upload it as a workflow
-artifact, and tag builds publish it as a GitHub release asset named
-`SwiftCurlCffi-iOS.zip`.
+The GitHub Actions workflow builds the same zip and publishes it as a GitHub
+release asset named `SwiftCurlCffi-iOS.zip`.
 
-## Automatic Releases
+## Manual Releases
 
-The `Sync curl_cffi release` GitHub Actions workflow runs once per day at
-05:23 UTC and can also be started manually. It checks the official
-`lexiforest/curl_cffi` GitHub releases, including prereleases, and compares the
-newest published tag with this repository's release assets.
+Releases do not run on pushes, tags, or a schedule. Start the
+`Build and release SwiftCurlCffi-iOS` workflow from the GitHub Actions page and
+enter the exact published `lexiforest/curl_cffi` release tag to build, including
+its leading `v`, for example `v0.15.1`.
 
-When the matching release does not exist here, the workflow:
+The workflow:
 
-1. Builds the exact upstream `curl_cffi` version for iOS.
-2. Creates a release using the same tag, title, and prerelease status.
-3. Uploads `SwiftCurlCffi-iOS.zip` to that release.
+1. Verifies that the tag belongs to a published upstream release.
+2. Builds that exact `curl_cffi` version for iOS.
+3. Creates or updates this repository's release with the exact same tag and
+   prerelease status.
+4. Uploads `SwiftCurlCffi-iOS.zip` to the release.
 
-Existing `SwiftCurlCffi-iOS.zip` release assets are skipped, so repeated daily
-checks do not rebuild or republish the same version. If a build or asset upload
-fails, the next scheduled run tries that upstream version again.
+Only one workflow run for a given tag can execute at a time.
 
 ## Export To Palladium
 

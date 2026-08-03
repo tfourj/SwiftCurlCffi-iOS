@@ -7,6 +7,11 @@ on:
         description: Exact curl_cffi release tag to build, for example v0.15.1
         required: true
         type: string
+      publish_as_latest:
+        description: Publish as latest instead of as a prerelease
+        required: true
+        type: boolean
+        default: false
 
 run-name: Release curl_cffi ${{ inputs.curl_cffi_tag }}
 
@@ -27,10 +32,12 @@ jobs:
       id: curl-cffi
       uses: actions/github-script@v9
       env:
+        PUBLISH_AS_LATEST: ${{ inputs.publish_as_latest }}
         REQUESTED_TAG: ${{ inputs.curl_cffi_tag }}
       with:
         script: |
           const requestedTag = process.env.REQUESTED_TAG;
+          const publishAsLatest = process.env.PUBLISH_AS_LATEST === "true";
 
           if (!requestedTag || requestedTag !== requestedTag.trim()) {
             core.setFailed("Enter an exact curl_cffi release tag without surrounding whitespace");
@@ -64,7 +71,6 @@ jobs:
 
           core.setOutput("tag", requestedTag);
           core.setOutput("version", version);
-          core.setOutput("prerelease", upstream.prerelease);
 
           await core.summary
             .addHeading("SwiftCurlCffi-iOS release")
@@ -75,7 +81,11 @@ jobs:
               ],
               ["curl_cffi tag", requestedTag],
               ["curl_cffi version", version],
-              ["Prerelease", String(upstream.prerelease)],
+              ["Upstream prerelease", String(upstream.prerelease)],
+              [
+                "Swift release type",
+                publishAsLatest ? "Latest release" : "Prerelease",
+              ],
             ])
             .write();
 
@@ -160,9 +170,11 @@ jobs:
         path: Dist/SwiftCurlCffi-iOS.zip
 
     - name: Publish GitHub release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: Dist/SwiftCurlCffi-iOS.zip
         tag_name: ${{ steps.curl-cffi.outputs.tag }}
         name: ${{ steps.curl-cffi.outputs.tag }}
-        prerelease: ${{ steps.curl-cffi.outputs.prerelease }}
+        prerelease: ${{ ! inputs.publish_as_latest }}
+        make_latest: ${{ inputs.publish_as_latest }}
+        overwrite_files: true

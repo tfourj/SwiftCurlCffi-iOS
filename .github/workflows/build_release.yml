@@ -1,43 +1,21 @@
-name: Build SwiftCurlCffi-iOS
+name: Build and release SwiftCurlCffi-iOS
 
 on:
-  push:
-    branches: [main]
-    tags: ["*"]
-    paths:
-      - ".github/workflows/build_release.yml"
-      - "Package.swift"
-      - "Sources/**"
-      - "docs/**"
-      - "scripts/**"
-      - ".gitignore"
-      - "README.md"
   workflow_dispatch:
-  workflow_call:
     inputs:
-      curl_cffi_version:
-        description: curl_cffi version to build without the leading v
-        required: false
+      curl_cffi_tag:
+        description: Exact curl_cffi release tag to build, for example v0.15.1
+        required: true
         type: string
-        default: ""
-      release_tag:
-        description: Git tag to create for the release
-        required: false
-        type: string
-        default: ""
-      release_name:
-        description: GitHub release title
-        required: false
-        type: string
-        default: ""
-      release_prerelease:
-        description: Whether to publish the GitHub release as a prerelease
-        required: false
-        type: boolean
-        default: false
+
+run-name: Release curl_cffi ${{ inputs.curl_cffi_tag }}
 
 permissions:
   contents: write
+
+concurrency:
+  group: release-curl-cffi-${{ inputs.curl_cffi_tag }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -45,6 +23,62 @@ jobs:
     timeout-minutes: 120
 
     steps:
+    - name: Resolve curl-cffi release
+      id: curl-cffi
+      uses: actions/github-script@v9
+      env:
+        REQUESTED_TAG: ${{ inputs.curl_cffi_tag }}
+      with:
+        script: |
+          const requestedTag = process.env.REQUESTED_TAG;
+
+          if (!requestedTag || requestedTag !== requestedTag.trim()) {
+            core.setFailed("Enter an exact curl_cffi release tag without surrounding whitespace");
+            return;
+          }
+
+          let upstream;
+          try {
+            const response = await github.rest.repos.getReleaseByTag({
+              owner: "lexiforest",
+              repo: "curl_cffi",
+              tag: requestedTag,
+            });
+            upstream = response.data;
+          } catch (error) {
+            if (error.status === 404) {
+              core.setFailed(`curl_cffi release tag not found: ${requestedTag}`);
+              return;
+            }
+            throw error;
+          }
+
+          if (upstream.draft || !upstream.published_at) {
+            core.setFailed(`curl_cffi release is not published: ${requestedTag}`);
+            return;
+          }
+
+          const version = requestedTag.startsWith("v")
+            ? requestedTag.slice(1)
+            : requestedTag;
+
+          core.setOutput("tag", requestedTag);
+          core.setOutput("version", version);
+          core.setOutput("prerelease", upstream.prerelease);
+
+          await core.summary
+            .addHeading("SwiftCurlCffi-iOS release")
+            .addTable([
+              [
+                { data: "Field", header: true },
+                { data: "Value", header: true },
+              ],
+              ["curl_cffi tag", requestedTag],
+              ["curl_cffi version", version],
+              ["Prerelease", String(upstream.prerelease)],
+            ])
+            .write();
+
     - name: Checkout code
       uses: actions/checkout@v4
 
@@ -106,26 +140,6 @@ jobs:
         echo "Installed Python.xcframework:"
         ls -la "$frameworks_dir/Python.xcframework"
 
-    - name: Resolve curl-cffi version
-      id: curl-cffi
-      env:
-        REQUESTED_VERSION: ${{ inputs.curl_cffi_version }}
-        REF_NAME: ${{ github.ref_name }}
-        REF_TYPE: ${{ github.ref_type }}
-      run: |
-        set -euo pipefail
-
-        if [ -n "$REQUESTED_VERSION" ]; then
-          version="$REQUESTED_VERSION"
-        elif [ "$REF_TYPE" = "tag" ]; then
-          version="${REF_NAME#v}"
-        else
-          version="latest"
-        fi
-
-        echo "Building curl-cffi $version"
-        echo "version=$version" >> "$GITHUB_OUTPUT"
-
     - name: Build curl-cffi payload
       env:
         CURL_CFFI_VERSION: ${{ steps.curl-cffi.outputs.version }}
@@ -146,10 +160,9 @@ jobs:
         path: Dist/SwiftCurlCffi-iOS.zip
 
     - name: Publish GitHub release
-      if: inputs.release_tag != '' || startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v2
       with:
         files: Dist/SwiftCurlCffi-iOS.zip
-        tag_name: ${{ inputs.release_tag || github.ref_name }}
-        name: ${{ inputs.release_name || inputs.release_tag || github.ref_name }}
-        prerelease: ${{ inputs.release_prerelease }}
+        tag_name: ${{ steps.curl-cffi.outputs.tag }}
+        name: ${{ steps.curl-cffi.outputs.tag }}
+        prerelease: ${{ steps.curl-cffi.outputs.prerelease }}

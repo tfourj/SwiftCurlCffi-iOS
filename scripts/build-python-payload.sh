@@ -142,6 +142,7 @@ build_curl_cffi_wrapper() {
   brotli_common_archive="$curl_deps_dir/libbrotlicommon.a"
   zstd_archive="$curl_deps_dir/libzstd.a"
   zlib_archive="$curl_deps_dir/libz.a"
+  cares_archive="$curl_deps_dir/libcares.a"
   for archive in \
     "$nghttp2_archive" \
     "$nghttp3_archive" \
@@ -153,7 +154,8 @@ build_curl_cffi_wrapper() {
     "$brotli_encode_archive" \
     "$brotli_common_archive" \
     "$zstd_archive" \
-    "$zlib_archive"
+    "$zlib_archive" \
+    "$cares_archive"
   do
     [ -f "$archive" ] || die "missing curl dependency archive: $archive"
   done
@@ -180,6 +182,7 @@ build_curl_cffi_wrapper() {
     "$brotli_common_archive" \
     "$zstd_archive" \
     "$zlib_archive" \
+    "$cares_archive" \
     -framework Python \
     -framework CoreFoundation \
     -framework Security \

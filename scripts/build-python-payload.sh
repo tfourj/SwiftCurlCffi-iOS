@@ -35,24 +35,24 @@ copy_python_sources() {
   find "$payload/curl_cffi" \
     \( -name '*.so' -o -name '*.o' -o -name '*.dylib' -o -name '_wrapper.c' \) \
     -delete
-  write_minimal_dist_info "$payload" "cffi" "$CFFI_BUILD_VERSION"
-  write_minimal_dist_info "$payload" "curl-cffi" "$CURL_CFFI_BUILD_VERSION"
+  write_dist_info "$payload" "cffi" "$CFFI_BUILD_VERSION" "$SOURCES_DIR/cffi"
+  write_dist_info "$payload" "curl-cffi" "$CURL_CFFI_BUILD_VERSION" "$SOURCES_DIR/curl_cffi"
 }
 
-write_minimal_dist_info() {
+write_dist_info() {
   payload=$1
   package_name=$2
   version=$3
+  src=$4
   safe_name=$(printf '%s' "$package_name" | tr '-' '_')
   dist_info="$payload/$safe_name-$version.dist-info"
 
+  [ -f "$src/PKG-INFO" ] || die "missing PKG-INFO for $package_name in $src"
+
   rm -rf "$dist_info"
   mkdir -p "$dist_info"
-  cat > "$dist_info/METADATA" <<EOF
-Metadata-Version: 2.1
-Name: $package_name
-Version: $version
-EOF
+  # Packages read fields like Summary at import time, so keep the full sdist metadata.
+  cp "$src/PKG-INFO" "$dist_info/METADATA"
   cat > "$dist_info/WHEEL" <<EOF
 Wheel-Version: 1.0
 Generator: SwiftCurlCffi-iOS

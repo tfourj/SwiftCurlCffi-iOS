@@ -38,9 +38,10 @@ and process them once from the copied `Frameworks/SwiftCurlCffi-iOS` checkout.
 - a host Python matching the embedded app Python minor version
 - Palladium's `Python.xcframework`
 
-Defaults target Python `3.14` because Palladium currently bundles Python 3.14.
-`curl-cffi` defaults to `latest`, with prereleases allowed because Python 3.14
-support may land in prerelease builds first.
+The target Python version and extension tag (for example `cpython-315`) are
+read from `Python.xcframework`, so the payload always matches the Python it was
+compiled against. `curl-cffi` defaults to `latest`, with prereleases allowed
+because support for new Python versions may land in prerelease builds first.
 
 The build must run on macOS with Xcode because it uses `xcrun`, Apple iOS SDKs,
 and the iPhoneOS/iPhoneSimulator arm64 toolchains. GitHub-hosted Ubuntu runners

@@ -26,6 +26,8 @@ jobs:
   build:
     runs-on: macos-latest
     timeout-minutes: 120
+    env:
+      EXPECTED_PYTHON_VERSION: "3.15"
 
     steps:
     - name: Resolve curl-cffi release
@@ -150,13 +152,50 @@ jobs:
         echo "Installed Python.xcframework:"
         ls -la "$frameworks_dir/Python.xcframework"
 
+    - name: Check Python Apple Support version
+      run: |
+        set -euo pipefail
+
+        header="$GITHUB_WORKSPACE/Frameworks/Python.xcframework/ios-arm64/Python.framework/Headers/patchlevel.h"
+        actual=$(sed -n 's/^#define PY_VERSION[[:space:]]*"\([0-9]*\.[0-9]*\).*"/\1/p' "$header" | head -n 1)
+
+        if [ "$actual" != "$EXPECTED_PYTHON_VERSION" ]; then
+          echo "Python.xcframework is Python ${actual:-unknown}, expected $EXPECTED_PYTHON_VERSION"
+          exit 1
+        fi
+
+        echo "Python.xcframework is Python $actual"
+
     - name: Build curl-cffi payload
       env:
         CURL_CFFI_VERSION: ${{ steps.curl-cffi.outputs.version }}
         PYTHON_XCFRAMEWORK: ${{ github.workspace }}/Frameworks/Python.xcframework
+        PYTHON_VERSION: ${{ env.EXPECTED_PYTHON_VERSION }}
       run: |
         set -euo pipefail
         ./scripts/build-all.sh
+
+    - name: Check payload Python version
+      run: |
+        set -euo pipefail
+
+        payload="Sources/SwiftCurlCffiIOS/Resources/curl_cffi_ios_payload.zip"
+        expected_tag="cpython-$(echo "$EXPECTED_PYTHON_VERSION" | tr -d '.')"
+        extensions=$(unzip -Z1 "$payload" | grep '\.so$' || true)
+
+        if [ -z "$extensions" ]; then
+          echo "No extension modules found in $payload"
+          exit 1
+        fi
+
+        mismatched=$(echo "$extensions" | grep -v "\.$expected_tag-" || true)
+        if [ -n "$mismatched" ]; then
+          echo "Payload was not built for $expected_tag:"
+          echo "$mismatched"
+          exit 1
+        fi
+
+        echo "Payload targets $expected_tag"
 
     - name: Package release zip
       run: |

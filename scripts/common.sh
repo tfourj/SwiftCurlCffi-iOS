@@ -7,8 +7,8 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-$ROOT_DIR/Artifacts}"
 RESOURCES_DIR="$ROOT_DIR/Sources/SwiftCurlCffiIOS/Resources"
 
 IOS_DEPLOYMENT_TARGET="${IOS_DEPLOYMENT_TARGET:-15.0}"
-PYTHON_VERSION="${PYTHON_VERSION:-3.14}"
-PYTHON_TAG="${PYTHON_TAG:-cpython-314}"
+PYTHON_VERSION="${PYTHON_VERSION:-}"
+PYTHON_TAG="${PYTHON_TAG:-}"
 CURL_CFFI_VERSION="${CURL_CFFI_VERSION:-latest}"
 CURL_CFFI_ALLOW_PRERELEASES="${CURL_CFFI_ALLOW_PRERELEASES:-1}"
 CFFI_VERSION="${CFFI_VERSION:-2.0.0}"
@@ -63,9 +63,9 @@ Options:
   --python-xcframework PATH
       Use a specific Python.xcframework.
   --python-version VERSION
-      Set the Python version written to the payload manifest.
+      Check the Python version against Python.xcframework (default: detected).
   --python-tag TAG
-      Set the Python extension tag, for example cpython-314.
+      Check the Python extension tag, for example cpython-315 (default: detected).
   --ios-deployment-target VERSION
       Set the iOS deployment target.
   --host-python PATH
@@ -239,6 +239,34 @@ ensure_python_xcframework() {
   [ -d "$PYTHON_XCFRAMEWORK" ] || die "Python.xcframework not found: $PYTHON_XCFRAMEWORK"
   [ -d "$PYTHON_XCFRAMEWORK/ios-arm64/Python.framework/Headers" ] || \
     die "missing iphoneos Python headers in $PYTHON_XCFRAMEWORK"
+  resolve_python_version
+}
+
+python_version_from_xcframework() {
+  header="$PYTHON_XCFRAMEWORK/ios-arm64/Python.framework/Headers/patchlevel.h"
+  [ -f "$header" ] || return 1
+
+  sed -n 's/^#define PY_VERSION[[:space:]]*"\([0-9]*\.[0-9]*\).*"/\1/p' "$header" | head -1
+}
+
+resolve_python_version() {
+  detected=$(python_version_from_xcframework || true)
+  [ -n "$detected" ] || die "could not read Python version from $PYTHON_XCFRAMEWORK"
+  detected_tag="cpython-$(printf '%s' "$detected" | tr -d '.')"
+
+  if [ -z "$PYTHON_VERSION" ]; then
+    PYTHON_VERSION=$detected
+  elif [ "$PYTHON_VERSION" != "$detected" ]; then
+    die "Python version $PYTHON_VERSION does not match Python.xcframework $detected"
+  fi
+
+  if [ -z "$PYTHON_TAG" ]; then
+    PYTHON_TAG=$detected_tag
+  elif [ "$PYTHON_TAG" != "$detected_tag" ]; then
+    die "Python tag $PYTHON_TAG does not match Python.xcframework $detected_tag"
+  fi
+
+  log "targeting Python $PYTHON_VERSION ($PYTHON_TAG)"
 }
 
 sdk_path() {
